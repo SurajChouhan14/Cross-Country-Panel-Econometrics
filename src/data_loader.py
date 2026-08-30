@@ -1,8 +1,9 @@
 """
-Panel Data Ingestion and Preprocessing Module.
+Panel Data Ingestion and Monte Carlo Simulation Module.
 
-Loads longitudinal cross-country bilateral trade and trade facilitation policy panel datasets
-across 120+ countries observed over a 10-year period (2014-2023).
+Generates a transparent longitudinal panel Data Generating Process (DGP)
+featuring 120 countries observed over 10 years (1,200 balanced country-year observations)
+with planted ground-truth structural coefficients for econometric specification testing.
 """
 
 import os
@@ -12,7 +13,7 @@ import pandas as pd
 
 class PanelDataLoader:
     """
-    Ingestion and formatting engine for multi-country longitudinal panel data.
+    Ingestion and simulation engine for multi-country longitudinal panel data.
     """
 
     def __init__(self, data_dir="data", n_countries=120, n_years=10, random_state=42):
@@ -20,7 +21,17 @@ class PanelDataLoader:
         self.n_countries = n_countries
         self.n_years = n_years
         self.random_state = random_state
-        self.output_csv = os.path.join(self.data_dir, "world_bank_trade_panel.csv")
+        self.output_csv = os.path.join(self.data_dir, "simulated_trade_panel_dgp.csv")
+        
+        # Planted ground-truth structural parameters
+        self.planted_beta = {
+            'tfi_score': 1.42,
+            'log_gdp': 0.85,
+            'log_distance': -0.65,  # Time-invariant gravity regressor
+            'tariff_rate': -0.04,
+            'infra_score': 0.35,
+            'fx_volatility': -0.80
+        }
 
     def load_panel_data(self):
         """
@@ -28,7 +39,7 @@ class PanelDataLoader:
         - Dependent Variable: log(Exports)
         - Key Policy Variable: Trade Facilitation Index (TFI, 0 to 1 scale)
         - Covariates: log(GDP), log(Distance), Tariff Rate (%), Exchange Rate Volatility, Infrastructure Score
-        - Structural Parameters: Unobserved Country Fixed Effects (alpha_i) and Time Shocks (lambda_t)
+        - Structural Parameters: Unobserved Country Fixed Effects (alpha_i) and Common Time Shocks (lambda_t)
         """
         if os.path.exists(self.output_csv):
             return pd.read_csv(self.output_csv)
@@ -63,12 +74,12 @@ class PanelDataLoader:
                 log_exports = (
                     country_fixed_effects[c]
                     + time_fixed_effects[y]
-                    + 0.85 * log_gdp
-                    - 0.65 * log_distance
-                    + 1.42 * tfi_score
-                    - 0.04 * tariff_rate
-                    + 0.35 * infra_score
-                    - 0.80 * fx_volatility
+                    + self.planted_beta['log_gdp'] * log_gdp
+                    + self.planted_beta['log_distance'] * log_distance
+                    + self.planted_beta['tfi_score'] * tfi_score
+                    + self.planted_beta['tariff_rate'] * tariff_rate
+                    + self.planted_beta['infra_score'] * infra_score
+                    + self.planted_beta['fx_volatility'] * fx_volatility
                     + epsilon
                 )
 

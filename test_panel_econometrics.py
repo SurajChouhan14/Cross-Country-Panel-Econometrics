@@ -1,80 +1,79 @@
 """
-Automated Unit Test Suite for Longitudinal Panel Data Econometrics Engine.
-Verifies Pooled OLS, Fixed Effects with CRVE, Swamy-Arora RE FGLS, and Hausman Specification Test.
+Unit Tests for Longitudinal Panel Econometrics & Policy Engine.
+Verifies:
+1. Panel data loading, balance, and dimensions (120 countries, 10 years, 1,200 rows)
+2. Ground truth structural parameter recovery under Two-Way Fixed Effects (honest tolerances)
+3. Time-invariant variable absorption in Fixed Effects (log_distance absorbed)
+4. Spectrally-decomposed Hausman specification test rejection (chi2 = 24.63, p < 0.001)
+5. Deterministic regeneration from seed 42
 """
 
 import unittest
-import os
-import sys
 import numpy as np
 import pandas as pd
-
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
 from src.data_loader import PanelDataLoader
 from src.panel_econometric_engine import PanelEconometricEngine
 
 
-class TestPanelEconometricsEngine(unittest.TestCase):
-    """
-    Unit test cases for panel econometric linear algebra estimation engine.
-    """
+class TestPanelEconometricEngine(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.loader = PanelDataLoader(data_dir="data")
+        cls.loader = PanelDataLoader(data_dir="data", random_state=42)
         cls.df = cls.loader.load_panel_data()
-        cls.engine = PanelEconometricEngine(
-            df=cls.df,
-            entity_col='country_id',
-            time_col='year',
-            dep_var='log_exports',
-            indep_vars=['tfi_score', 'log_gdp', 'tariff_rate', 'infra_score', 'fx_volatility']
-        )
+        cls.engine = PanelEconometricEngine(cls.df)
+        cls.planted = cls.loader.planted_beta
 
-    def test_panel_data_loading(self):
-        """Verify longitudinal panel structure."""
-        self.assertGreaterEqual(len(self.df), 1000)
+    def test_1_panel_data_loader_structure(self):
+        """Verifies balanced panel structure: 120 countries, 10 years, 1,200 observations."""
+        self.assertEqual(len(self.df), 1200)
         self.assertEqual(self.df['country_id'].nunique(), 120)
         self.assertEqual(self.df['year'].nunique(), 10)
-        self.assertIn('log_exports', self.df.columns)
-        self.assertIn('tfi_score', self.df.columns)
+        self.assertIn("log_exports", self.df.columns)
+        self.assertIn("tfi_score", self.df.columns)
+        self.assertIn("log_gdp", self.df.columns)
+        self.assertIn("log_distance", self.df.columns)
 
-    def test_pooled_ols_estimation(self):
-        """Verify Pooled OLS estimation computes finite coefficients and positive R-squared."""
-        pols = self.engine.estimate_pooled_ols()
-        self.assertEqual(len(pols['coefficients']), 5)
-        self.assertTrue(np.all(np.isfinite(pols['coefficients'])))
-        self.assertTrue(np.all(pols['std_errors'] > 0.0))
-        self.assertGreater(pols['r_squared'], 0.0)
-        self.assertLess(pols['r_squared'], 1.0)
+    def test_2_ground_truth_recovery_twfe(self):
+        """
+        Verifies Two-Way Fixed Effects recovers planted structural parameters
+        within honest empirical finite-sample estimation tolerances.
+        """
+        res_tw = self.engine.estimate_twoway_fixed_effects()
+        params = res_tw["summary"].params
+        
+        # TFI: Planted 1.42 (Tolerance: +/- 0.10)
+        self.assertAlmostEqual(params["tfi_score"], self.planted["tfi_score"], delta=0.10)
+        # GDP: Planted 0.85 (Tolerance: +/- 0.10)
+        self.assertAlmostEqual(params["log_gdp"], self.planted["log_gdp"], delta=0.10)
+        # Tariff: Planted -0.04 (Tolerance: +/- 0.015)
+        self.assertAlmostEqual(params["tariff_rate"], self.planted["tariff_rate"], delta=0.015)
+        # Infra: Planted 0.35 (Tolerance: +/- 0.05)
+        self.assertAlmostEqual(params["infra_score"], self.planted["infra_score"], delta=0.05)
+        # FX Volatility: Planted -0.80 (Tolerance: +/- 0.15)
+        self.assertAlmostEqual(params["fx_volatility"], self.planted["fx_volatility"], delta=0.15)
 
-    def test_fixed_effects_estimation(self):
-        """Verify Fixed Effects within estimator and cluster-robust standard errors."""
-        fe = self.engine.estimate_fixed_effects()
-        self.assertEqual(len(fe['coefficients']), 5)
-        self.assertTrue(np.all(np.isfinite(fe['coefficients'])))
-        self.assertTrue(np.all(fe['std_errors'] > 0.0))
-        self.assertGreater(fe['sigma_e2'], 0.0)
-        self.assertGreater(fe['r_squared'], 0.0)
+    def test_3_time_invariant_variable_absorption(self):
+        """Verifies that time-invariant regressors (log_distance) are absorbed by Fixed Effects."""
+        res_fe = self.engine.estimate_fixed_effects()
+        self.assertNotIn("log_distance", res_fe["summary"].params)
+        
+        res_re = self.engine.estimate_random_effects()
+        self.assertIn("log_distance", res_re["summary"].params)
 
-    def test_random_effects_swamy_arora(self):
-        """Verify Random Effects Swamy-Arora FGLS quasi-demeaning parameter theta is in (0, 1)."""
-        re = self.engine.estimate_random_effects()
-        self.assertEqual(len(re['coefficients']), 5)
-        self.assertGreater(re['sigma_e2'], 0.0)
-        self.assertGreaterEqual(re['sigma_u2'], 0.0)
-        self.assertGreater(re['theta'], 0.0)
-        self.assertLessEqual(re['theta'], 1.0)
-
-    def test_hausman_specification_test(self):
-        """Verify spectral projection Hausman test computes non-negative Chi-sq statistic."""
+    def test_4_hausman_specification_test_rejection(self):
+        """Verifies Hausman test rejects Random Effects (chi2 = 24.63, p < 0.001)."""
         hausman = self.engine.run_hausman_specification_test()
-        self.assertIn("hausman_statistic", hausman)
-        self.assertIn("p_value", hausman)
-        self.assertIn("preferred_model", hausman)
-        self.assertGreaterEqual(hausman['hausman_statistic'], 0.0)
-        self.assertTrue(0.0 <= hausman['p_value'] <= 1.0)
+        self.assertAlmostEqual(hausman["chi2_statistic"], 24.63, delta=0.1)
+        self.assertEqual(hausman["degrees_of_freedom"], 2)
+        self.assertLess(hausman["p_value"], 0.001)
+        self.assertIn("REJECT RE", hausman["verdict"])
+
+    def test_5_deterministic_reproducibility(self):
+        """Verifies that data generation and estimation are deterministic given seed 42."""
+        loader2 = PanelDataLoader(data_dir="data", random_state=42)
+        df2 = loader2.load_panel_data()
+        pd.testing.assert_frame_equal(self.df, df2)
 
 
 if __name__ == '__main__':

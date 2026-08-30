@@ -1,57 +1,89 @@
-# 🌐 Longitudinal Panel Econometrics & Policy Estimation Engine
-### Pooled OLS | Fixed Effects (Within & CRVE) | Random Effects (Swamy-Arora FGLS) | Hausman Specification Test | linearmodels
+# Longitudinal Panel Econometrics & Policy Engine
+> **Multi-Country Longitudinal Panel Econometrics, Entity & Time Fixed Effects, Swamy-Arora FGLS & Spectrally-Decomposed Hausman Test**  
+> *Monte Carlo Macroeconomic Panel DGP (120 Countries × 10 Years, 1,200 Observations)*
 
-[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
-[![Econometrics](https://img.shields.io/badge/Econometrics-linearmodels%20%2F%20statsmodels-success.svg)](https://bashtage.github.io/linearmodels/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-
-An econometric estimation engine analyzing **120 countries across 10 annual periods (1,200 longitudinal observations)**. Implements Fixed Effects with Liang-Zeger Cluster-Robust Standard Errors (CRVE), Random Effects via Swamy-Arora FGLS, and spectrally-decomposed Hausman specification tests using `linearmodels`.
-
----
-
-## 📌 Econometric Methodology & Hausman Specification Test
-
-### 1. Fixed Effects (Within-Transformation):
-$$(y_{it} - \bar{y}_i) = (\mathbf{x}_{it} - \bar{\mathbf{x}}_i)^T \boldsymbol{\beta} + (\epsilon_{it} - \bar{\epsilon}_i)$$
-* Sweeps out unobserved, time-invariant entity heterogeneity $\alpha_i$, eliminating omitted variable bias.
-
-### 2. Spectrally-Decomposed Hausman Test:
-$$H = (\hat{\boldsymbol{\beta}}_{\text{FE}} - \hat{\boldsymbol{\beta}}_{\text{RE}})^T \left[\hat{\mathbf{V}}_{\text{FE, homo}} - \hat{\mathbf{V}}_{\text{RE}}\right]^+ (\hat{\boldsymbol{\beta}}_{\text{FE}} - \hat{\boldsymbol{\beta}}_{\text{RE}})$$
-* **Test Statistic:** $\mathbf{\chi^2 = 24.63 \; (p < 0.001, \text{df}=2)}$.
-* **Verdict:** Reject $H_0 \implies$ Random Effects is inconsistent due to endogeneity; **Fixed Effects is validated as the consistent estimator**.
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![Econometrics](https://img.shields.io/badge/Econometrics-Panel%20FE%20%26%20RE-blueviolet.svg)]()
+[![Tests](https://img.shields.io/badge/tests-5%20passed-brightgreen.svg)]()
+[![Hausman Test](https://img.shields.io/badge/Hausman%20Test-chi2%20%3D%2024.63%20(p%20%3C%200.001)-brightgreen.svg)]()
 
 ---
 
-## 📊 Empirical Estimation Results
-| Regressor | Pooled OLS (SE) | Fixed Effects CRVE (SE) | Swamy-Arora RE (SE) |
-|---|:---:|:---:|:---:|
-| **TFI Score** | $1.5082$ ($0.3788$) | **$1.2584$ ($0.1671$)** | $1.1800$ ($0.1343$) |
-| **Log GDP** | $0.8687$ ($0.0244$) | **$0.5704$ ($0.1626$)** | $0.8219$ ($0.0677$) |
-| **Tariff Rate** | $-0.0277$ ($0.0163$) | **$-0.0342$ ($0.0057$)** | $-0.0311$ ($0.0057$) |
-| **Infra Score** | $0.1609$ ($0.1623$) | **$0.2139$ ($0.0630$)** | $0.1842$ ($0.0569$) |
-| **FX Volatility** | $-0.3509$ ($0.4844$) | **$-1.0818$ ($0.1772$)** | $-1.0778$ ($0.1710$) |
+## 🎯 Executive Overview & Econometric Architecture
+Cross-country macroeconomic panels suffer from **unobserved country-level heterogeneity** ($lpha_i$, e.g., institutional quality, geographic advantages, legal systems) and **common time shocks** ($\lambda_t$, e.g., global commodity price shocks, worldwide recessions). 
 
----
+If unobserved country effects correlate with observed macroeconomic regressors ($	ext{Cov}(lpha_i, X_{it}) 
+eq 0$), standard **Pooled OLS** and **Random Effects** estimators are structurally biased and inconsistent.
 
-## 📂 Repository Structure
+This repository implements a **Longitudinal Panel Econometric Engine** built with `linearmodels` and `NumPy`, evaluating:
+1. **Pooled Ordinary Least Squares (POLS)**: Naive baseline ignoring panel structure.
+2. **Entity-Only Fixed Effects (Within Estimator)**: Eliminates unobserved time-invariant heterogeneity $lpha_i$ via entity demeaning.
+3. **Two-Way Fixed Effects (TWFE)**: Simultaneously controls for country fixed effects $lpha_i$ and common macro shocks $\lambda_t$, eliminating omitted trend bias on trending regressors.
+4. **Random Effects (Swamy-Arora FGLS)**: Quasi-demeaned GLS efficient under the orthogonality condition $	ext{Cov}(lpha_i, X_{it}) = 0$.
+5. **Spectrally-Decomposed Hausman Specification Test**: Mathematically tests $	ext{Cov}(lpha_i, X_{it}) = 0$ via Moore-Penrose pseudo-inversion over the positive-definite subspace of $(V_{	ext{FE}} - V_{	ext{RE}})$.
+
 ```
-Cross-Country-Panel-Econometrics/
-├── src/
-│   ├── panel_econometric_engine.py # linearmodels FE, RE & Hausman test
-│   └── data_loader.py              # Longitudinal panel dataset ingestion
-├── Cross_Country_Panel_Econometrics.ipynb # Interactive evaluation notebook
-├── run_pipeline.py                 # Pipeline execution script
-├── test_panel_econometrics.py      # Unit testing suite (5/5 passing)
-└── requirements.txt                # Production dependencies
+   y_it = α_i + λ_t + β_1·TFI_it + β_2·log(GDP_it) + β_3·Tariff_it + β_4·Infra_it + β_5·FX_it + γ·Distance_i + ε_it
 ```
 
 ---
 
-## 🚀 Quickstart & Reproducibility
+## 📊 Ground Truth Recovery & Econometric Specification Results
+
+### Monte Carlo Calibration DGP (120 Countries × 10 Years, 1,200 Observations)
+
+| Regressor Variable | Planted Truth $eta$ | Two-Way FE (TWFE) 🏆<br>*(Entity + Time Effects)* | Entity-Only FE<br>*(Time Effects Omitted)* | Random Effects<br>*(Swamy-Arora FGLS)* | Econometric Interpretation |
+|---|:---:|:---:|:---:|:---:|---|
+| **Trade Facilitation (TFI)** | **$1.4200$** | **$1.4668$** *(error: $+0.047$)* | $1.2584$ | $1.1752$ | Key trade policy elasticity |
+| **log(GDP)** | **$0.8500$** | **$0.9076$** *(error: $+0.058$)* | **$0.5704$** *(error: $-0.280$)* | $0.8358$ | **Omitting time trend biased Entity-FE to 0.57; TWFE restores 0.91!** |
+| **Tariff Rate (%)** | **$-0.0400$** | **$-0.0434$** *(error: $-0.003$)* | $-0.0342$ | $-0.0308$ | Negative trade friction effect |
+| **Infrastructure Score** | **$0.3500$** | **$0.3237$** *(error: $-0.026$)* | $0.2139$ | $0.1835$ | Positive logistics capital elasticity |
+| **Exchange Rate Volatility** | **$-0.8000$** | **$-0.9071$** *(error: $-0.107$)* | $-1.0818$ | $-1.0774$ | Currency uncertainty friction |
+| **log(Distance)** *(Time-Invariant)* | **$-0.6500$** | **`[Absorbed / Dropped]`** | **`[Absorbed / Dropped]`** | **$-0.9783$** *(error: $-0.328$)* | **Absorbed by FE country demeaning; estimated with bias in RE** |
+
+---
+
+## 🔬 Key Econometric Findings
+
+1. **Why Two-Way Fixed Effects (TWFE) is Required:**
+   * In macroeconomic panels, variables like GDP exhibit common upward trends over time. Entity-only demeaning fails to disentangle the shared macroeconomic trend from country-specific GDP variation, biasing the estimated GDP elasticity downward to **$0.5704$**.
+   * By adding **Time Effects** ($\lambda_t$), TWFE demeans across both entities and years, successfully isolating true country-specific variation and recovering the planted elasticity at **$0.9076$** (within $0.058$ of truth).
+
+2. **Time-Invariant Regressor Absorption:**
+   * Gravity variables like `log(Distance)` do not vary over time within a country pair ($x_{i,t} - ar{x}_i = 0$).
+   * Fixed Effects absorbs distance by mathematical construction, whereas Random Effects estimates it (at $-0.9783$) but produces inconsistent estimates due to correlation with unobserved country traits $lpha_i$.
+
+---
+
+## 🧪 Spectrally-Decomposed Hausman Specification Test
+
+```text
+Hausman Test: Comparing Fixed Effects vs. Random Effects Covariance Matrices
+  • Null Hypothesis (H0)   : Cov(alpha_i, X_it) = 0 (Random Effects is consistent and efficient)
+  • Alternative (H1)       : Cov(alpha_i, X_it) != 0 (Random Effects is biased; Fixed Effects is required)
+  • Test Statistic (χ²)    : 24.63
+  • Degrees of Freedom (df): 2 (Rank of the positive-definite subspace of V_FE - V_RE)
+  • Asymptotic p-value     : 4.48e-06 (p < 0.001)
+  • Specification Verdict  : REJECT RE (p < 0.001) -> Fixed Effects unobserved heterogeneity correction is strictly required.
+```
+
+---
+
+## ⚡ Quickstart (Under 1 Second Execution)
+
+### 1. Installation
 ```bash
 git clone https://github.com/SurajChouhan14/Cross-Country-Panel-Econometrics.git
 cd Cross-Country-Panel-Econometrics
 pip install -r requirements.txt
+```
+
+### 2. Run Panel Tournament Pipeline
+```bash
 python run_pipeline.py
-python -m unittest test_panel_econometrics.py
+```
+
+### 3. Run Unit Test Suite
+```bash
+python test_panel_econometrics.py
 ```
