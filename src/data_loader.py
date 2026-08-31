@@ -7,6 +7,8 @@ with planted ground-truth structural coefficients for econometric specification 
 """
 
 import os
+import hashlib
+import json
 import numpy as np
 import pandas as pd
 
@@ -22,6 +24,7 @@ class PanelDataLoader:
         self.n_years = n_years
         self.random_state = random_state
         self.output_csv = os.path.join(self.data_dir, "simulated_trade_panel_dgp.csv")
+        self.meta_json = os.path.join(self.data_dir, "dgp_metadata.json")
         
         # Planted ground-truth structural parameters
         self.planted_beta = {
@@ -33,6 +36,16 @@ class PanelDataLoader:
             'fx_volatility': -0.80
         }
 
+    def _compute_dgp_signature(self):
+        """Computes deterministic signature of DGP parameters for cache invalidation."""
+        dgp_spec = {
+            "n_countries": self.n_countries,
+            "n_years": self.n_years,
+            "random_state": self.random_state,
+            "planted_beta": self.planted_beta
+        }
+        return hashlib.sha256(json.dumps(dgp_spec, sort_keys=True).encode()).hexdigest()
+
     def load_panel_data(self):
         """
         Generates/Loads a balanced panel dataset of 120 countries over 10 years (1,200 country-year observations).
@@ -41,8 +54,16 @@ class PanelDataLoader:
         - Covariates: log(GDP), log(Distance), Tariff Rate (%), Exchange Rate Volatility, Infrastructure Score
         - Structural Parameters: Unobserved Country Fixed Effects (alpha_i) and Common Time Shocks (lambda_t)
         """
-        if os.path.exists(self.output_csv):
-            return pd.read_csv(self.output_csv)
+        expected_sig = self._compute_dgp_signature()
+
+        if os.path.exists(self.output_csv) and os.path.exists(self.meta_json):
+            try:
+                with open(self.meta_json, 'r') as f:
+                    meta = json.load(f)
+                if meta.get("dgp_signature") == expected_sig:
+                    return pd.read_csv(self.output_csv)
+            except Exception:
+                pass
 
         np.random.seed(self.random_state)
         countries = [f"Country_{i:03d}" for i in range(1, self.n_countries + 1)]
@@ -97,4 +118,6 @@ class PanelDataLoader:
 
         df = pd.DataFrame(records)
         df.to_csv(self.output_csv, index=False)
+        with open(self.meta_json, 'w') as f:
+            json.dump({"dgp_signature": expected_sig, "n_records": len(df)}, f)
         return df

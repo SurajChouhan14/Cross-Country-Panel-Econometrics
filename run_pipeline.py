@@ -15,12 +15,8 @@ if hasattr(sys.stdout, "reconfigure"):
     except Exception:
         pass
 
-try:
-    from src.data_loader import PanelDataLoader
-    from src.panel_econometric_engine import PanelEconometricEngine
-except ImportError:
-    from data_loader import PanelDataLoader
-    from panel_econometric_engine import PanelEconometricEngine
+from src.data_loader import PanelDataLoader
+from src.panel_econometric_engine import PanelEconometricEngine
 
 
 def main():
@@ -73,20 +69,27 @@ def main():
     b_dist_re = re['summary'].params['log_distance']
     log(f"{'log_distance':<18} | {planted['log_distance']:10.4f} | {'[Absorbed / Dropped]':<22} | {'[Absorbed / Dropped]':<18} | {b_dist_re:10.4f} (err: {b_dist_re-planted['log_distance']:+.3f})")
     log("-" * 105)
-    log("  >>> KEY ECONOMETRIC FINDING: Omitting common time trend biased Entity-Only FE GDP elasticity to 0.5704.")
-    log("      Two-Way Fixed Effects (TWFE) absorbs the shared macro trend and restores log(GDP) elasticity to 0.9076!")
+    
+    gdp_en_val = fe_ent['summary'].params['log_gdp']
+    gdp_tw_val = fe_tw['summary'].params['log_gdp']
+    log(f"  >>> KEY ECONOMETRIC FINDING: Omitting common time trend biased Entity-Only FE GDP elasticity to {gdp_en_val:.4f}.")
+    log(f"      Two-Way Fixed Effects (TWFE) absorbs the shared macro trend and restores log(GDP) elasticity to {gdp_tw_val:.4f}!")
     log("  >>> TIME-INVARIANT REGRESSOR: log(distance) is absorbed by FE country demeaning by construction;")
-    log("      RE estimates distance (-0.9783) but is inconsistent due to correlation with country effects α_i.")
+    log(f"      RE estimates distance ({b_dist_re:.4f}) but is biased due to omitted common macroeconomic time shocks λ_t.")
     log("=" * 105)
 
     log("\n[3/4] Executing Spectrally-Decomposed Hausman Specification Test...")
     hausman = engine.run_hausman_specification_test()
-    log(f"      Null Hypothesis (H0)   : Cov(alpha_i, X_it) = 0 (Random Effects consistent & efficient)")
-    log(f"      Alternative (H1)       : Cov(alpha_i, X_it) != 0 (Random Effects biased; Fixed Effects required)")
+    log(f"      Null Hypothesis (H0)   : Cov(alpha_i, X_it) = 0 & Model Correctly Specified (RE consistent & efficient)")
+    log(f"      Alternative (H1)       : RE inconsistent due to unobserved heterogeneity / omitted time effects")
     log(f"      Hausman Stat (χ²)      : {hausman['chi2_statistic']} (df = {hausman['degrees_of_freedom']}, rank of positive-definite subspace)")
     log(f"      Asymptotic p-value     : {hausman['p_value']:.4e} (p < 0.001)")
     log(f"      Specification Verdict  : {hausman['verdict']}")
-    log(f"      >>> RESUME CLAIM VERIFIED: Hausman χ² = {hausman['chi2_statistic']} (p < 0.001) confirms FE specification! <<<")
+    
+    if hausman['p_value'] < 0.001:
+        log(f"      >>> RESUME CLAIM VERIFIED: Hausman χ² = {hausman['chi2_statistic']} (p < 0.001) confirms FE specification! <<<")
+    else:
+        log(f"      >>> HAUSMAN TEST COMPLETED: Stat = {hausman['chi2_statistic']}, p-value = {hausman['p_value']:.4e} <<<")
 
     log("\n[4/4] Generating Frozen Specification Report...")
     out_file = os.path.join(results_dir, "final_benchmark.txt")

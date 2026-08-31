@@ -12,15 +12,14 @@
 ## 🎯 Executive Overview & Econometric Architecture
 Cross-country macroeconomic panels suffer from **unobserved country-level heterogeneity** ($lpha_i$, e.g., institutional quality, geographic advantages, legal systems) and **common time shocks** ($\lambda_t$, e.g., global commodity price shocks, worldwide recessions). 
 
-If unobserved country effects correlate with observed macroeconomic regressors ($	ext{Cov}(lpha_i, X_{it}) 
-eq 0$), standard **Pooled OLS** and **Random Effects** estimators are structurally biased and inconsistent.
+If unobserved panel structure or common time shocks are omitted, standard **Pooled OLS** and **Random Effects** estimators are structurally biased and inconsistent.
 
-This repository implements a **Longitudinal Panel Econometric Engine** built with `linearmodels` and `NumPy`, evaluating:
+This repository implements a **Longitudinal Panel Econometric Engine** built with `linearmodels` and `statsmodels`, evaluating:
 1. **Pooled Ordinary Least Squares (POLS)**: Naive baseline ignoring panel structure.
 2. **Entity-Only Fixed Effects (Within Estimator)**: Eliminates unobserved time-invariant heterogeneity $lpha_i$ via entity demeaning.
 3. **Two-Way Fixed Effects (TWFE)**: Simultaneously controls for country fixed effects $lpha_i$ and common macro shocks $\lambda_t$, eliminating omitted trend bias on trending regressors.
 4. **Random Effects (Swamy-Arora FGLS)**: Quasi-demeaned GLS efficient under the orthogonality condition $	ext{Cov}(lpha_i, X_{it}) = 0$.
-5. **Spectrally-Decomposed Hausman Specification Test**: Mathematically tests $	ext{Cov}(lpha_i, X_{it}) = 0$ via Moore-Penrose pseudo-inversion over the positive-definite subspace of $(V_{	ext{FE}} - V_{	ext{RE}})$.
+5. **Spectrally-Decomposed Hausman Specification Test**: Mathematically tests specification consistency via Moore-Penrose pseudo-inversion over the positive-definite subspace of $(V_{	ext{FE}} - V_{	ext{RE}})$.
 
 ```
    y_it = α_i + λ_t + β_1·TFI_it + β_2·log(GDP_it) + β_3·Tariff_it + β_4·Infra_it + β_5·FX_it + γ·Distance_i + ε_it
@@ -49,9 +48,9 @@ This repository implements a **Longitudinal Panel Econometric Engine** built wit
    * In macroeconomic panels, variables like GDP exhibit common upward trends over time. Entity-only demeaning fails to disentangle the shared macroeconomic trend from country-specific GDP variation, biasing the estimated GDP elasticity downward to **$0.5704$**.
    * By adding **Time Effects** ($\lambda_t$), TWFE demeans across both entities and years, successfully isolating true country-specific variation and recovering the planted elasticity at **$0.9076$** (within $0.058$ of truth).
 
-2. **Time-Invariant Regressor Absorption:**
+2. **Time-Invariant Regressor Absorption & RE Misspecification:**
    * Gravity variables like `log(Distance)` do not vary over time within a country pair ($x_{i,t} - ar{x}_i = 0$).
-   * Fixed Effects absorbs distance by mathematical construction, whereas Random Effects estimates it (at $-0.9783$) but produces inconsistent estimates due to correlation with unobserved country traits $lpha_i$.
+   * Fixed Effects absorbs distance by mathematical construction, whereas Random Effects estimates it (at $-0.9783$) but is biased due to omitted common time shocks $\lambda_t$.
 
 ---
 
@@ -59,8 +58,8 @@ This repository implements a **Longitudinal Panel Econometric Engine** built wit
 
 ```text
 Hausman Test: Comparing Fixed Effects vs. Random Effects Covariance Matrices
-  • Null Hypothesis (H0)   : Cov(alpha_i, X_it) = 0 (Random Effects is consistent and efficient)
-  • Alternative (H1)       : Cov(alpha_i, X_it) != 0 (Random Effects is biased; Fixed Effects is required)
+  • Null Hypothesis (H0)   : Cov(alpha_i, X_it) = 0 & Model Correctly Specified (RE consistent and efficient)
+  • Alternative (H1)       : RE is inconsistent (Fixed Effects required)
   • Test Statistic (χ²)    : 24.63
   • Degrees of Freedom (df): 2 (Rank of the positive-definite subspace of V_FE - V_RE)
   • Asymptotic p-value     : 4.48e-06 (p < 0.001)

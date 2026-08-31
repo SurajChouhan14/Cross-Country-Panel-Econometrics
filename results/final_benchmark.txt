@@ -24,12 +24,12 @@ log_distance       |    -0.6500 | [Absorbed / Dropped]   | [Absorbed / Dropped] 
   >>> KEY ECONOMETRIC FINDING: Omitting common time trend biased Entity-Only FE GDP elasticity to 0.5704.
       Two-Way Fixed Effects (TWFE) absorbs the shared macro trend and restores log(GDP) elasticity to 0.9076!
   >>> TIME-INVARIANT REGRESSOR: log(distance) is absorbed by FE country demeaning by construction;
-      RE estimates distance (-0.9783) but is inconsistent due to correlation with country effects α_i.
+      RE estimates distance (-0.9783) but is biased due to omitted common macroeconomic time shocks λ_t.
 =========================================================================================================
 
 [3/4] Executing Spectrally-Decomposed Hausman Specification Test...
-      Null Hypothesis (H0)   : Cov(alpha_i, X_it) = 0 (Random Effects consistent & efficient)
-      Alternative (H1)       : Cov(alpha_i, X_it) != 0 (Random Effects biased; Fixed Effects required)
+      Null Hypothesis (H0)   : Cov(alpha_i, X_it) = 0 & Model Correctly Specified (RE consistent & efficient)
+      Alternative (H1)       : RE inconsistent due to unobserved heterogeneity / omitted time effects
       Hausman Stat (χ²)      : 24.63 (df = 2, rank of positive-definite subspace)
       Asymptotic p-value     : 4.4824e-06 (p < 0.001)
       Specification Verdict  : REJECT RE (p < 0.001) -> Fixed Effects unobserved heterogeneity correction is strictly required
